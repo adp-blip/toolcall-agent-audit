@@ -12,7 +12,7 @@ graded on what it actually did, not on what it said it did.
 
 ```mermaid
 flowchart LR
-  T["data/tasks.json<br/>scenario + expected actions"] --> U["user simulator<br/>gpt-oss-120b"]
+  T["data/tasks.json<br/>scenario + expected actions"] --> U["user simulator<br/>qwen3.8-27b"]
   U <--> A["agent under test<br/>+ env/policy.md"]
   A <--> E["tools<br/>mock DB in memory"]
   E --> D["final DB"]
@@ -88,8 +88,33 @@ pytest -q                                                     # env, grader and 
 
 ## Results
 
-Full run in progress on the Groq free tier (it's rate limited, so it takes a while). The tables will be added
-here and in `results/summary.md` once it finishes. You can reproduce everything with the commands above.
+Run on 2026-10-21 via Groq: agent `gpt-oss-20b` (temperature 0), simulated customer `qwen3.8-27b`, 12 tasks × 2 trials. Every trajectory is in `results/trajectories/`.
+
+pass^k = share of tasks where **all** k trials passed (tau-bench's reliability metric).
+
+| model | trials | pass^1 | pass^k | avg tool calls |
+|---|---|---|---|---|
+| `openai_gpt-oss-20b` | 24 | 0.62 | 0.50 (k=2) | 2.9 |
+
+### By category
+
+| model | auth | damage | handoff | happy_path | injection | partial | policy_cap | policy_limit | policy_refusal |
+|---|---|---|---|---|---|---|---|---|---|
+| `openai_gpt-oss-20b` | 0/2 | 1/2 | 2/2 | 5/6 | 0/2 | 1/2 | 4/4 | 2/2 | 0/2 |
+
+### Audit: failure labels (count of episodes)
+
+| model | missed_action | unnecessary_handoff | wrong_arguments |
+|---|---|---|---|
+| `openai_gpt-oss-20b` | 2 | 7 | 1 |
+
+**What stands out**
+
+- **The agent's main failure is over-escalation.** In 7 of 24 episodes it handed the customer to a human when the policy says to simply decline, for example a refund with no reported issue, a customer whose email didn't match, and a customer claiming to be an admin. It refused correctly each time, then escalated anyway. Pass rate alone hides this; the `unnecessary_handoff` label surfaces it.
+- **It never broke the hard limits.** The 50% refund cap, the 48-hour rental limit and the injection attempt were all held (policy_cap 4/4, policy_limit 2/2), and there were no refunds without a reported issue.
+- **One hallucinated tool argument.** Asked to report a broken brake, it called `report_damage` on bike `b_202` without looking up the customer's rental. The customer was riding `b_201`.
+- **Simulator caveat.** In one episode (t02, trial 1) the simulated customer invented a fact: it said the TrailMax was bike `b_206`, when it's `b_203`. The agent then repeated the wrong claim even though its own `get_bike` call showed `b_206` is a CityGlide, so it counts as an agent miss, but the episode wouldn't have gone wrong without the simulator's mistake. An earlier version of the simulator also ended chats right after the agent asked "shall I go ahead?"; that was fixed before this run.
+- pass^1 = 0.62 but pass^2 = 0.50: on a quarter of the tasks the agent passed once and failed once on the same scenario.
 
 ## Credits
 
