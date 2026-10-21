@@ -30,7 +30,10 @@ def run(args):
         out = RESULTS / f"{_safe(model)}.jsonl"
         done = set()
         if out.exists() and args.resume:
-            done = {(r["task_id"], r["trial"]) for r in map(json.loads, out.read_text(encoding="utf-8").splitlines())}
+            # keep finished episodes, redo the ones that crashed (usually rate limits)
+            kept = [l for l in out.read_text(encoding="utf-8").splitlines() if l.strip() and "crash" not in json.loads(l)["labels"]]
+            out.write_text("".join(l + "\n" for l in kept), encoding="utf-8")
+            done = {(r["task_id"], r["trial"]) for r in map(json.loads, kept)}
         print(f"\n== {model}")
         with open(out, "a" if args.resume else "w", encoding="utf-8") as f:
             for task in tasks:

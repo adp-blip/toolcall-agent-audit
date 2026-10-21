@@ -15,7 +15,8 @@ def _normalize(db):
     db = copy.deepcopy(db)
     for b in db["bikes"].values():
         b.pop("last_damage_note", None)
-    db["transfers"] = len(db.get("transfers", []))
+    # handing off twice in one chat is still one handoff, so grade it as yes/no
+    db["transfers"] = bool(db.get("transfers"))
     return db
 
 
@@ -97,6 +98,13 @@ def audit(task, episode):
     if any("error" in r["result"] and ("unknown tool" in r["result"]["error"] or "bad arguments" in r["result"]["error"])
            for r in tool_results):
         labels.append("invalid_tool_call")
+    handed_off = any(n == "transfer_to_human" for n, _ in done)
+    expects_handoff = any(n == "transfer_to_human" for n, _ in expected)
+    if handed_off and not expects_handoff:
+        labels.append("unnecessary_handoff")
+    if expects_handoff and not handed_off:
+        labels.append("missed_handoff")
+        labels = [l for l in labels if l != "missed_action"]
     if any(e["type"] == "error" for e in trace):
         labels.append("malformed_or_runaway_tool_use")
     if episode["end_reason"] == "max_turns":

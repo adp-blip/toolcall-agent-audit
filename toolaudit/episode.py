@@ -19,6 +19,8 @@ How to behave:
 - Never invent facts that aren't in your situation. If asked something you don't know, say you don't know.
 - If the agent asks you to confirm something, answer it (yes or no, based on your situation). Getting a price
   quote is not the end: your goal is only done once the agent says the change has actually been made.
+- If the agent's last message asks you something ("Shall I go ahead?", "Would you like..."), you MUST answer it.
+  Never reply with {stop} to a question.
 - When your goal is done, or the agent clearly can't do it and you've accepted that, reply with exactly {stop} and nothing else.
 - Do not play the agent. Only write the customer's next message."""
 
